@@ -45,20 +45,15 @@
 #define LATITUDE    48.17407
 #define LONGITUDE   11.58409
 
-#if CONFIG_FREERTOS_UNICORE
-#define ARDUINO_RUNNING_CORE 0
-#else
-#define ARDUINO_RUNNING_CORE 1
-#endif
- 
 #if !( defined(ESP8266) ||  defined(ESP32) )
   #error This code is intended to run on the ESP8266 or ESP32 platform! Please check your Tools->Board setting.
 #endif
 
-#define ESP_WIFIMANAGER_VERSION_MIN_TARGET     "ESP_WiFiManager v1.7.3"
+#define ESP_WIFIMANAGER_VERSION_MIN_TARGET      "ESP_WiFiManager v1.11.0"
+#define ESP_WIFIMANAGER_VERSION_MIN             1011000
 
 // Use from 0 to 4. Higher number, more debugging messages and memory usage.
-#define _WIFIMGR_LOGLEVEL_    4
+#define _WIFIMGR_LOGLEVEL_    3
 
 #include <FS.h>
 
@@ -73,25 +68,45 @@
   WiFiMulti wifiMulti;
 
   // LittleFS has higher priority than SPIFFS
-  #if ( ARDUINO_ESP32C3_DEV )
-    // Currently, ESP32-C3 only supporting SPIFFS and EEPROM. Will fix to support LittleFS
-    #define USE_LITTLEFS          false
-    #define USE_SPIFFS            true
-  #else
+  #if ( defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 2) )
     #define USE_LITTLEFS    true
     #define USE_SPIFFS      false
+  #elif defined(ARDUINO_ESP32C3_DEV)
+    // For core v1.0.6-, ESP32-C3 only supporting SPIFFS and EEPROM. To use v2.0.0+ for LittleFS
+    #define USE_LITTLEFS          false
+    #define USE_SPIFFS            true
   #endif
 
   #if USE_LITTLEFS
     // Use LittleFS
     #include "FS.h"
 
-    // The library has been merged into esp32 core release 1.0.6
-     #include <LITTLEFS.h>             // https://github.com/lorol/LITTLEFS
+    // Check cores/esp32/esp_arduino_version.h and cores/esp32/core_version.h
+    //#if ( ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(2, 0, 0) )  //(ESP_ARDUINO_VERSION_MAJOR >= 2)
+    #if ( defined(ESP_ARDUINO_VERSION_MAJOR) && (ESP_ARDUINO_VERSION_MAJOR >= 2) )
+      #if (_WIFIMGR_LOGLEVEL_ > 3)
+        #warning Using ESP32 Core 1.0.6 or 2.0.0+
+      #endif
+      
+      // The library has been merged into esp32 core from release 1.0.6
+      #include <LittleFS.h>       // https://github.com/espressif/arduino-esp32/tree/master/libraries/LittleFS
+      
+      FS* filesystem =      &LittleFS;
+      #define FileFS        LittleFS
+      #define FS_Name       "LittleFS"
+    #else
+      #if (_WIFIMGR_LOGLEVEL_ > 3)
+        #warning Using ESP32 Core 1.0.5-. You must install LITTLEFS library
+      #endif
+      
+      // The library has been merged into esp32 core from release 1.0.6
+      #include <LITTLEFS.h>       // https://github.com/lorol/LITTLEFS
+      
+      FS* filesystem =      &LITTLEFS;
+      #define FileFS        LITTLEFS
+      #define FS_Name       "LittleFS"
+    #endif
     
-    FS* filesystem =      &LITTLEFS;
-    #define FileFS        LITTLEFS
-    #define FS_Name       "LittleFS"
   #elif USE_SPIFFS
     #include <SPIFFS.h>
     FS* filesystem =      &SPIFFS;
@@ -106,8 +121,6 @@
   #endif
     //////
     
-    #define ESP_getChipId()   ((uint32_t)ESP.getEfuseMac())
-
 #define LED_BUILTIN       2
 #define LED_ON            HIGH
 #define LED_OFF           LOW
@@ -136,7 +149,7 @@
   #endif
   //////
   
-  #define ESP_getChipId()   (ESP.getChipId())
+  #define ESP_getChipId()   ((uint32_t)ESP.getEfuseMac())
   
   #define LED_ON      LOW
   #define LED_OFF     HIGH
@@ -204,7 +217,7 @@ DoubleResetDetector* drd;//////
 const int PIN_LED = 2; // D4 on NodeMCU and WeMos. GPIO2/ADC12 of ESP32. Controls the onboard LED.
 
 // SSID and PW for Config Portal
-String ssid       = "ESP_" + String(ESP_getChipId(), HEX);
+String ssid       = "ESP_" + String((uint32_t)ESP.getEfuseMac(), HEX);
 String password;
 
 // SSID and PW for your Router
@@ -343,7 +356,7 @@ uint8_t connectMultiWiFi();
 #include <FastLED.h>
 
 #define LED_PIN     13
-#define NUM_LEDS    50
+#define NUM_LEDS    49
 #define BRIGHTNESS  255
 #define LED_TYPE    WS2811
 #define COLOR_ORDER GRB
