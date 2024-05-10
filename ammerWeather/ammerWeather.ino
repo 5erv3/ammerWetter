@@ -354,6 +354,14 @@ IPAddress APStaticSN  = IPAddress(255, 255, 255, 0);
 uint8_t connectMultiWiFi();
 
 #include <FastLED.h>
+#include <ArduinoJson.h>
+#include <HTTPClient.h>
+#include <TimeLib.h>
+
+String formattedDate;
+String json_array;
+unsigned long last_time = 0;
+int WeatherCODE = 0;
 
 #define LED_PIN     13
 #define NUM_LEDS    49
@@ -580,6 +588,10 @@ void printLocalTime()
     Serial.print("Local Date/Time: ");
     Serial.print( asctime( &timeinfo ) );
   }
+  String MeteoAPI = SetupMeteoApi();
+  Serial.println("SERVER REQUEST SENT");
+  json_array = GET_Request(MeteoAPI.c_str());
+  JsonCONV();  
 #endif
 }
 
@@ -841,12 +853,26 @@ void setSingleLED(int8_t h, int8_t m, CRGB color, CHSV background_color){
   }  
 }
 
+CRGB getColorFromWeather(){
+  if (WeatherCODE == 0)             return CRGB::Yellow;     //Animation_SUNNY();
+  if (WeatherCODE >=1 && WeatherCODE <=3) return CRGB::LightBlue; //Animation_CLOUDY(); 
+  if (WeatherCODE >=80 && WeatherCODE <=81 ) return CRGB::MidnightBlue;//Animation_RAIN();
+  if (WeatherCODE >=61 && WeatherCODE <=63) return CRGB::MidnightBlue;//Animation_RAIN();
+  if (WeatherCODE == 65 || WeatherCODE == 82) return CRGB::MidnightBlue;//Animation_HEAVY_RAIN();
+  if (WeatherCODE == 95)        return CRGB::HotPink;          //Animation_STORM();
+  if (WeatherCODE >=96 && WeatherCODE <=99) return CRGB::HotPink;//Animation_HEAVY_STORM(); 
+  if (WeatherCODE >=45 && WeatherCODE <=48) return CRGB::HotPink;    //Animation_FOG(); 
+  if (WeatherCODE >=71 && WeatherCODE <=77) return CRGB::White; //Animation_SNOW(); 
+  if (WeatherCODE == 86)                    return CRGB::White;//Animation_HEAVY_SNOW();
+
+}
+
 void updateLedTime(int8_t test_hour=-1, int8_t test_min=-1) {
 
   CHSV daylight_color_back = CHSV( 0, 0, 0);
   CHSV night_color_back = CHSV( HUE_PURPLE, 80, 20);
   CHSV deep_night_color_back = CHSV( 0, 0, 0);
-  CRGB color_sun = CRGB::Yellow;
+  CRGB color_sun = getColorFromWeather();
   CRGB color_moon = CRGB::Orange;
   CRGB color_deep_moon = CRGB(10,53,40);
 
@@ -1415,4 +1441,77 @@ void TaskWifiHandler(void *pvParameters)
     check_status();
     delay(1000);
   }
+}
+
+void addTime(int seconds, tm* date) {
+    if (date == NULL) return;
+    date->tm_sec += seconds;
+    mktime(date);
+}
+
+int DayForecast = 1;
+
+String SetupMeteoApi() {
+    // (LONG) = Longitude
+    // (LAT) = Latitude
+    // (DATE) = TOMORROW DATE
+    
+    String Api="https://api.open-meteo.com/v1/forecast?latitude=(LAT)&longitude=(LONG)&daily=weathercode&timezone=auto&start_date=(DATE)&end_date=(DATE)";
+  
+    struct tm timeinfo;
+    getLocalTime( &timeinfo );
+    addTime(60*60*24, &timeinfo);
+
+    char TomorrowDate[10];
+    sprintf(TomorrowDate,"%04u-%02u-%02u ",timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
+    char lat[6], lon[6];
+    sprintf(lat, "%.2f", LATITUDE);
+    sprintf(lon, "%.2f", LONGITUDE);
+
+    Api.replace("(DATE)",String(TomorrowDate));
+    Api.replace("(LONG)", String(lon));
+    Api.replace("(LAT)", String(lat));
+
+    Serial.println(Api);
+
+    return Api;
+    
+}
+
+void JsonCONV() {
+    DynamicJsonDocument doc(16384); //TO DO
+    DeserializationError error = deserializeJson(doc, json_array);
+
+    if (error) {
+     Serial.print("deserializeJson() failed: ");
+     Serial.println(error.c_str());
+     return;
+    }
+
+  const char* daily_units_weathercode = doc["daily_units"]["weathercode"]; 
+  const char* daily_time_0 = doc["daily"]["time"][0]; 
+  WeatherCODE = doc["daily"]["weathercode"][0]; 
+  Serial.print("Weathercode: ");
+  Serial.println(WeatherCODE);
+
+}
+
+String GET_Request(const char* server) {
+  HTTPClient http;    
+  http.begin(server);
+  int httpResponseCode = http.GET();
+  String payload = "{}"; 
+  
+  if (httpResponseCode>0) {
+    Serial.print("HTTP RRESPONSE CODE: ");
+    Serial.println(httpResponseCode);
+    payload = http.getString();
+  }
+  else {
+    Serial.print("ERROR CODE: ");
+    Serial.println(httpResponseCode);
+  }
+  http.end();
+
+  return payload;
 }
