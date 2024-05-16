@@ -867,6 +867,7 @@ CRGB getColorFromWeather(){
 
 }
 
+
 void updateLedTime(int8_t test_hour=-1, int8_t test_min=-1) {
 
   CHSV daylight_color_back = CHSV( 0, 0, 0);
@@ -1456,19 +1457,13 @@ String SetupMeteoApi() {
     // (LAT) = Latitude
     // (DATE) = TOMORROW DATE
     
-    String Api="https://api.open-meteo.com/v1/forecast?latitude=(LAT)&longitude=(LONG)&daily=weathercode&timezone=auto&start_date=(DATE)&end_date=(DATE)";
-  
-    struct tm timeinfo;
-    getLocalTime( &timeinfo );
-    addTime(60*60*24, &timeinfo);
+    //String Api="https://api.open-meteo.com/v1/forecast?latitude=(LAT)&longitude=(LONG)&daily=weathercode&timezone=auto&start_date=(DATE)&end_date=(DATE)";
+    String Api="https://api.open-meteo.com/v1/forecast?latitude=(LAT)&longitude=(LONG)&forecast_days=2&current=temperature_2m,is_day&hourly=temperature_2m,rain,weather_code&timezone=Europe%2FBerlin";
 
-    char TomorrowDate[10];
-    sprintf(TomorrowDate,"%04u-%02u-%02u ",timeinfo.tm_year + 1900, timeinfo.tm_mon + 1, timeinfo.tm_mday);
     char lat[6], lon[6];
     sprintf(lat, "%.2f", LATITUDE);
     sprintf(lon, "%.2f", LONGITUDE);
 
-    Api.replace("(DATE)",String(TomorrowDate));
     Api.replace("(LONG)", String(lon));
     Api.replace("(LAT)", String(lat));
 
@@ -1477,6 +1472,11 @@ String SetupMeteoApi() {
     return Api;
     
 }
+
+int rain_in_2h = 0;
+int temp_in_2h = 0;
+int temp_current = 0;
+int is_day = 1;
 
 void JsonCONV() {
     DynamicJsonDocument doc(16384); //TO DO
@@ -1488,11 +1488,30 @@ void JsonCONV() {
      return;
     }
 
-  const char* daily_units_weathercode = doc["daily_units"]["weathercode"]; 
-  const char* daily_time_0 = doc["daily"]["time"][0]; 
-  WeatherCODE = doc["daily"]["weathercode"][0]; 
-  Serial.print("Weathercode: ");
-  Serial.println(WeatherCODE);
+  //const char* daily_units_weathercode = doc["daily_units"]["weathercode"]; 
+  //const char* daily_time_0 = doc["daily"]["time"][0]; 
+  //WeatherCODE = doc["daily"]["weathercode"][0]; 
+  //Serial.print("Weathercode: ");
+  //Serial.println(WeatherCODE);
+
+  struct tm timeinfo;
+  getLocalTime( &timeinfo );
+
+  int hour_in_2h = timeinfo.tm_hour + 2;
+
+  temp_current = doc["current"]["temperature_2m"];
+  temp_in_2h = doc["hourly"]["temperature_2m"][hour_in_2h];
+  int rain1h = doc["hourly"]["rain"][hour_in_2h - 1];
+  int rain2h = doc["hourly"]["rain"][hour_in_2h];
+  rain_in_2h = rain1h + rain2h;
+  is_day = doc["current"]["is_day"];
+
+  Serial.print("Current Temp: ");
+  Serial.print(temp_current);
+  Serial.print(", Temp2h: ");
+  Serial.print(temp_in_2h);
+  Serial.print(", Rain: ");
+  Serial.println(rain_in_2h);
 
 }
 
