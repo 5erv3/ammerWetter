@@ -363,6 +363,11 @@ String json_array;
 unsigned long last_time = 0;
 int WeatherCODE = 0;
 
+int rain_in_2h = 0;
+int temp_in_2h = 0;
+int temp_current = 0;
+int is_day = 1;
+
 #define LED_PIN     13
 #define NUM_LEDS    49
 #define BRIGHTNESS  255
@@ -398,6 +403,59 @@ typedef enum sunstate_e {
   SUNSTATE_SUN_DOWN_BEFORE_MIDNIGHT,
   SUNSTATE_SUN_DOWN_AFTER_MIDNIGHT
 }sunstate;
+
+
+
+
+DEFINE_GRADIENT_PALETTE( temperature_gp ) {
+    0,   1,  1,106,
+   11,   1,  1,106,
+   11,   1,  6,137,
+   22,   1,  6,137,
+   22,   2, 13,140,
+   33,   2, 13,140,
+   33,   4, 22,144,
+   44,   4, 22,144,
+   44,   4, 29,135,
+   55,   4, 29,135,
+   55,   8, 40,151,
+   66,   8, 40,151,
+   66,  12, 53,156,
+   77,  12, 53,156,
+   77,  16, 69,164,
+   88,  16, 69,164,
+   88,  21, 85,170,
+   99,  21, 85,170,
+   99,  40,125,203,
+  110,  40,125,203,
+  110,  82,175,255,
+  121,  82,175,255,
+  121, 128,201,111,
+  133, 128,201,111,
+  133, 103,189, 89,
+  144, 103,189, 89,
+  144,  97,175, 64,
+  155,  97,175, 64,
+  155, 133,161, 35,
+  166, 133,161, 35,
+  166, 171,149, 19,
+  177, 171,149, 19,
+  177, 177,131, 14,
+  188, 177,131, 14,
+  188, 167, 96, 11,
+  199, 167, 96, 11,
+  199, 155, 74,  8,
+  210, 155, 74,  8,
+  210, 152, 60,  7,
+  221, 152, 60,  7,
+  221, 142, 42,  6,
+  232, 142, 42,  6,
+  232, 139, 31,  4,
+  243, 139, 31,  4,
+  243, 133, 14,  2,
+  255, 133, 14,  2};
+
+CRGBPalette16 tempPal = temperature_gp;
 
 ///////////////////////////////////////////
 // New in v1.4.0
@@ -645,7 +703,7 @@ void check_status()
 #define WIFICHECK_INTERVAL    1000L
 
 #if USE_ESP_WIFIMANAGER_NTP
-  #define HEARTBEAT_INTERVAL    60000L
+  #define HEARTBEAT_INTERVAL    (5 * 60 * 1000L)
 #else
   #define HEARTBEAT_INTERVAL    10000L
 #endif
@@ -811,8 +869,53 @@ sunstate getSunState(int hour, int min, int year, int month, int day, int daylig
   return SUNSTATE_SUN_DOWN_BEFORE_MIDNIGHT;
 }
 
-void setSingleLED(int8_t h, int8_t m, CRGB color, CHSV background_color){
-  static int lastLedNb = 0;
+int brightness = BRIGHTNESS / 3;
+
+void setCurrentTempLED(){
+  fill_solid( &(leds[0]), NUM_LEDS, CRGB::Black );
+  //CRGB color = CRGB::Red;
+
+  int temp_led = ((((int) temp_current) + 10 )/2) +2 ;
+
+  fill_palette(leds, temp_led, 0, 12, tempPal, brightness, NOBLEND);
+
+  Serial.print("currenttempled: ");
+  Serial.println(temp_led);
+
+}
+
+void set2hTempLED(){
+  CRGB color = CRGB::Red;
+
+  int temp_led = NUM_LEDS - ((((int) temp_in_2h) + 10 )/2);
+  //int temp_led = ((((int) temp_in_2h) + 10 )/2) +2 ;
+
+  //fill_palette(leds2, temp_led, 0, 12, tempPal, brightness, NOBLEND);
+  leds[temp_led] = color;
+
+  Serial.print("2h templed: ");
+  Serial.println(temp_led);
+}
+
+void setRain(){
+  CRGB color = CRGB::Black;
+  if (rain_in_2h > 0){
+    color = CRGB::Blue;
+  }
+  leds[25] = color;
+  leds[26] = color;
+}
+
+void setBrightness(){
+  brightness = BRIGHTNESS/3;
+  if (!is_day){
+    brightness /= 3;
+  }
+  FastLED.setBrightness(brightness);
+}
+
+void setSingleLED(){
+  /*static int lastLedNb = 0;
   static CRGB lastcolor = CRGB::Black;
   
   if (h >= 12){
@@ -827,30 +930,12 @@ void setSingleLED(int8_t h, int8_t m, CRGB color, CHSV background_color){
   float ledsperhour = led_nb / 12.0;
   float lednb_f = (hour_f * ledsperhour) +  ((min_f * ledsperhour) / 60.0) + 1.0;
   int lednb = (int) lednb_f;
-
-  if (lastLedNb != lednb || lastcolor != color){
-    fill_solid( &(leds[0]), NUM_LEDS, background_color );
-    
-    lastLedNb = lednb;
-    lastcolor = color;
-    if (NUM_LEDS - lednb > 0){
-      leds[NUM_LEDS - lednb -1] = color;
-    } 
-    leds[NUM_LEDS - lednb] = color;
-    if (NUM_LEDS - lednb < NUM_LEDS) {
-      leds[NUM_LEDS - lednb +1] = color;
-    }
-
-    FastLED.show();
-    
-    Serial.print(F("hour/min= "));
-    Serial.print(h);
-    Serial.print(m);
-    Serial.print(F(" single led nb_f = , "));
-    Serial.print(lednb_f);
-    Serial.print(F(" single led nb = "));
-    Serial.println(lednb);    
-  }  
+*/
+  setCurrentTempLED();
+  set2hTempLED();
+  setRain();
+  setBrightness();
+  FastLED.show();
 }
 
 CRGB getColorFromWeather(){
@@ -869,7 +954,7 @@ CRGB getColorFromWeather(){
 
 
 void updateLedTime(int8_t test_hour=-1, int8_t test_min=-1) {
-
+/*
   CHSV daylight_color_back = CHSV( 0, 0, 0);
   CHSV night_color_back = CHSV( HUE_PURPLE, 80, 20);
   CHSV deep_night_color_back = CHSV( 0, 0, 0);
@@ -881,13 +966,14 @@ void updateLedTime(int8_t test_hour=-1, int8_t test_min=-1) {
   CRGB indicator_color;
 
   sunstate sun_state;
-
+*/
 
   struct tm timeinfo;
   getLocalTime( &timeinfo );
 
   if (timeinfo.tm_year > 100 )
   {
+    /*
 #if TESTING
     sun_state = getSunState(test_hour, test_min, 2021, 11, 21, 0);
 #else
@@ -907,11 +993,11 @@ void updateLedTime(int8_t test_hour=-1, int8_t test_min=-1) {
         indicator_color = color_deep_moon;
       break;
     }
-
+*/
 #if TESTING
-    setSingleLED(test_hour, test_min, indicator_color, background_color);
+    setSingleLED();
 #else
-    setSingleLED(timeinfo.tm_hour, timeinfo.tm_min, indicator_color, background_color);
+    setSingleLED();
 #endif
   } else {
     Serial.print(F("ERROR: Time not yet set"));
@@ -1038,7 +1124,7 @@ void TaskLedHandler(void *pvParameters)
   (void) pvParameters;
   Serial.println("LED Task Started");
   
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );  
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, 0, NUM_LEDS).setCorrection( TypicalLEDStrip ); 
   FastLED.setBrightness(  BRIGHTNESS / 3 );
   fill_solid( &(leds[0]), NUM_LEDS, CRGB::Black );
   FastLED.show();
@@ -1473,10 +1559,6 @@ String SetupMeteoApi() {
     
 }
 
-int rain_in_2h = 0;
-int temp_in_2h = 0;
-int temp_current = 0;
-int is_day = 1;
 
 void JsonCONV() {
     DynamicJsonDocument doc(16384); //TO DO
