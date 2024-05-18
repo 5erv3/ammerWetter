@@ -869,15 +869,23 @@ sunstate getSunState(int hour, int min, int year, int month, int day, int daylig
   return SUNSTATE_SUN_DOWN_BEFORE_MIDNIGHT;
 }
 
-int brightness = BRIGHTNESS / 3;
+int brightness = BRIGHTNESS / 2;
 
 void setCurrentTempLED(){
   fill_solid( &(leds[0]), NUM_LEDS, CRGB::Black );
   //CRGB color = CRGB::Red;
 
-  int temp_led = ((((int) temp_current) + 10 )/2) +2 ;
+  if (temp_current < -10){
+    temp_current = -10;
+  }
+  if (temp_current > 35){
+    temp_current = 35;
+  }
 
-  fill_palette(leds, temp_led, 0, 12, tempPal, brightness, NOBLEND);
+  int temp_led = temp_current + 10 + 2;
+
+  //fill_palette(&(leds[2]), temp_led, 24, 12, tempPal, brightness, NOBLEND);
+  fill_palette(&(leds[2]), temp_led, 36, 5, tempPal, brightness, LINEARBLEND);
 
   Serial.print("currenttempled: ");
   Serial.println(temp_led);
@@ -887,29 +895,41 @@ void setCurrentTempLED(){
 void set2hTempLED(){
   CRGB color = CRGB::Red;
 
-  int temp_led = NUM_LEDS - ((((int) temp_in_2h) + 10 )/2);
-  //int temp_led = ((((int) temp_in_2h) + 10 )/2) +2 ;
+  int led_start = 28;
 
-  //fill_palette(leds2, temp_led, 0, 12, tempPal, brightness, NOBLEND);
-  leds[temp_led] = color;
+  //int temp_led = NUM_LEDS - ((((int) temp_in_2h) + 10 )/2);
+  int temp_led = ((((int) temp_in_2h) + 10 )/2) +led_start;
+
+  if (temp_led > NUM_LEDS-1){
+    temp_led = NUM_LEDS-1;
+  } else if (temp_led < led_start){
+    temp_led = led_start;
+  }
+
+  /*fill_palette(&(leds[led_start]), temp_led, 24, 12, tempPal, brightness, NOBLEND);
+  //leds[temp_led] = color;
+  int i=led_start;
+  for (i=led_start+temp_led;i<NUM_LEDS-1;i++){
+    leds[i] = CRGB::Black;
+  }
 
   Serial.print("2h templed: ");
-  Serial.println(temp_led);
+  Serial.println(temp_led);*/
 }
 
 void setRain(){
   CRGB color = CRGB::Black;
   if (rain_in_2h > 0){
-    color = CRGB::Blue;
+    color = CRGB::Purple;
   }
-  leds[25] = color;
-  leds[26] = color;
+  leds[0] = color;
+  leds[NUM_LEDS -1] = color;
 }
 
 void setBrightness(){
-  brightness = BRIGHTNESS/3;
+  brightness = BRIGHTNESS/2;
   if (!is_day){
-    brightness /= 3;
+    brightness /= 2;
   }
   FastLED.setBrightness(brightness);
 }
@@ -1583,9 +1603,14 @@ void JsonCONV() {
 
   temp_current = doc["current"]["temperature_2m"];
   temp_in_2h = doc["hourly"]["temperature_2m"][hour_in_2h];
-  int rain1h = doc["hourly"]["rain"][hour_in_2h - 1];
-  int rain2h = doc["hourly"]["rain"][hour_in_2h];
-  rain_in_2h = rain1h + rain2h;
+  rain_in_2h = 0;
+
+  int i=0;
+  for(i=0;i<4;i++){
+    int rain = doc["hourly"]["rain"][timeinfo.tm_hour + i];
+    rain_in_2h += rain;
+  }
+  
   is_day = doc["current"]["is_day"];
 
   Serial.print("Current Temp: ");
