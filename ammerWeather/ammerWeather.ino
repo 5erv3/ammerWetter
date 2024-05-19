@@ -871,9 +871,15 @@ sunstate getSunState(int hour, int min, int year, int month, int day, int daylig
 
 int brightness = BRIGHTNESS / 2;
 
-void setCurrentTempLED(){
+void setCurrentTempLED(int testing=100){
   fill_solid( &(leds[0]), NUM_LEDS, CRGB::Black );
   //CRGB color = CRGB::Red;
+
+  if(testing!=100){
+    temp_current = testing;
+    Serial.print("testtemp: ");
+    Serial.println(temp_current);
+  }
 
   if (temp_current < -10){
     temp_current = -10;
@@ -885,7 +891,7 @@ void setCurrentTempLED(){
   int temp_led = temp_current + 10 + 2;
 
   //fill_palette(&(leds[2]), temp_led, 24, 12, tempPal, brightness, NOBLEND);
-  fill_palette(&(leds[2]), temp_led, 36, 5, tempPal, brightness, LINEARBLEND);
+  fill_palette(&(leds[2]), temp_led, 31, 5, tempPal, brightness, LINEARBLEND);
 
   Serial.print("currenttempled: ");
   Serial.println(temp_led);
@@ -917,13 +923,18 @@ void set2hTempLED(){
   Serial.println(temp_led);*/
 }
 
-void setRain(){
+void setRain(int testing=100){
   CRGB color = CRGB::Black;
+  if (testing != 100){
+    rain_in_2h = testing;
+  }
   if (rain_in_2h > 0){
     color = CRGB::Purple;
   }
   leds[0] = color;
+  leds[1] = color;
   leds[NUM_LEDS -1] = color;
+  leds[NUM_LEDS -2] = color;
 }
 
 void setBrightness(){
@@ -1140,12 +1151,14 @@ void TaskLedHandler(void *pvParameters)
   static led_state last_state = LED_STATE_NONE;
   static led_state last_state_report = LED_STATE_NONE;
   static uint8_t startIndex = 0;
+  static int temp = -10;
+  static int rain = 1;
   
   (void) pvParameters;
   Serial.println("LED Task Started");
   
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, 0, NUM_LEDS).setCorrection( TypicalLEDStrip ); 
-  FastLED.setBrightness(  BRIGHTNESS / 3 );
+  FastLED.setBrightness(  BRIGHTNESS / 2 );
   fill_solid( &(leds[0]), NUM_LEDS, CRGB::Black );
   FastLED.show();
 
@@ -1162,14 +1175,20 @@ void TaskLedHandler(void *pvParameters)
     }
     
     switch(led_statemachine_status){
-      case LED_STATE_INIT: 
-        FastLED.setBrightness(BRIGHTNESS/3);
-        currentPalette = RainbowColors_p;
-        currentBlending = LINEARBLEND;        
-        startIndex = startIndex + 1;
-        FillLEDsFromPaletteColors(startIndex);
+      case LED_STATE_INIT:         
+        setCurrentTempLED(temp);
+        setRain(rain);
+        if (rain > 0){
+          rain = 0;
+        } else {
+          rain = 1;
+        }
+        temp = temp + 5;
+        if (temp > 35){
+          temp = -10;
+        }
         FastLED.show();
-        FastLED.delay(1000 / UPDATES_PER_SECOND);
+        FastLED.delay(500);
         break;
         
       case LED_STATE_INIT_ERR:
