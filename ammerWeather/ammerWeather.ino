@@ -909,7 +909,7 @@ void setRain(int testing=100){
     rain_in_2h = testing;
   }
   if (rain_in_2h > 0){
-    color = CRGB::Green;
+    color = CRGB::White;
   }
   leds[0] = color;
   leds[1] = color;
