@@ -656,7 +656,6 @@ void printLocalTime()
 void heartBeatPrint()
 {
   String MeteoAPI = SetupMeteoApi();
-  Serial.println("SERVER REQUEST SENT");
   json_array = GET_Request(MeteoAPI.c_str());
   JsonCONV();   
 }
@@ -1503,7 +1502,6 @@ String SetupMeteoApi() {
     // (LAT) = Latitude
     // (DATE) = TOMORROW DATE
     
-    //String Api="https://api.open-meteo.com/v1/forecast?latitude=(LAT)&longitude=(LONG)&daily=weathercode&timezone=auto&start_date=(DATE)&end_date=(DATE)";
     String Api="https://api.open-meteo.com/v1/forecast?latitude=(LAT)&longitude=(LONG)&forecast_days=2&current=temperature_2m,is_day&hourly=temperature_2m,rain,weather_code&timezone=Europe%2FBerlin";
 
     char lat[6], lon[6];
@@ -1513,7 +1511,7 @@ String SetupMeteoApi() {
     Api.replace("(LONG)", String(lon));
     Api.replace("(LAT)", String(lat));
 
-    Serial.println(Api);
+    //Serial.println(Api);
 
     return Api;
     
