@@ -217,7 +217,7 @@ DoubleResetDetector* drd;//////
 const int PIN_LED = 2; // D4 on NodeMCU and WeMos. GPIO2/ADC12 of ESP32. Controls the onboard LED.
 
 // SSID and PW for Config Portal
-String ssid       = "ESP_" + String((uint32_t)ESP.getEfuseMac(), HEX);
+String ssid       = "JULIMARTIN";
 String password;
 
 // SSID and PW for your Router
@@ -281,7 +281,7 @@ bool initialConfig = false;
 
 // Use false to disable NTP config. Advisable when using Cellphone, Tablet to access Config Portal.
 // See Issue 23: On Android phone ConfigPortal is unresponsive (https://github.com/khoih-prog/ESP_WiFiManager/issues/23)
-#define USE_ESP_WIFIMANAGER_NTP     true
+#define USE_ESP_WIFIMANAGER_NTP     false
 
 // Just use enough to save memory. On ESP8266, can cause blank ConfigPortal screen
 // if using too much memory
@@ -389,7 +389,6 @@ typedef enum led_states_e {
   LED_STATE_INIT_ERR,
   LED_STATE_CONFIG,
   LED_STATE_NOCONNECTION,
-  LED_STATE_WIFI_OK_TIME_WAITING,
   LED_STATE_NORMAL,
   LED_STATE_OFF
 }led_state;
@@ -647,7 +646,6 @@ void printLocalTime()
     Serial.print( asctime( &timeinfo ) );
   }
   String MeteoAPI = SetupMeteoApi();
-  Serial.println("SERVER REQUEST SENT");
   json_array = GET_Request(MeteoAPI.c_str());
   JsonCONV();  
 #endif
@@ -657,26 +655,10 @@ void printLocalTime()
 
 void heartBeatPrint()
 {
-#if USE_ESP_WIFIMANAGER_NTP
-  printLocalTime();
-#else
-  static int num = 1;
-
-  if (WiFi.status() == WL_CONNECTED)
-    Serial.print(F("H"));        // H means connected to WiFi
-  else
-    Serial.print(F("F"));        // F means not connected to WiFi
-
-  if (num == 80)
-  {
-    Serial.println();
-    num = 1;
-  }
-  else if (num++ % 10 == 0)
-  {
-    Serial.print(F(" "));
-  }
-#endif  
+  String MeteoAPI = SetupMeteoApi();
+  Serial.println("SERVER REQUEST SENT");
+  json_array = GET_Request(MeteoAPI.c_str());
+  JsonCONV();   
 }
 
 void check_WiFi()
@@ -705,7 +687,7 @@ void check_status()
 #if USE_ESP_WIFIMANAGER_NTP
   #define HEARTBEAT_INTERVAL    (5 * 60 * 1000L)
 #else
-  #define HEARTBEAT_INTERVAL    10000L
+  #define HEARTBEAT_INTERVAL    (5 * 60 * 1000L)
 #endif
 
   current_millis = millis();
@@ -893,8 +875,6 @@ void setCurrentTempLED(int testing=100){
   //fill_palette(&(leds[2]), temp_led, 24, 12, tempPal, brightness, NOBLEND);
   fill_palette(&(leds[2]), temp_led, 31, 5, tempPal, brightness, LINEARBLEND);
 
-  Serial.print("currenttempled: ");
-  Serial.println(temp_led);
 
 }
 
@@ -929,7 +909,7 @@ void setRain(int testing=100){
     rain_in_2h = testing;
   }
   if (rain_in_2h > 0){
-    color = CRGB::Purple;
+    color = CRGB::Green;
   }
   leds[0] = color;
   leds[1] = color;
@@ -985,55 +965,10 @@ CRGB getColorFromWeather(){
 
 
 void updateLedTime(int8_t test_hour=-1, int8_t test_min=-1) {
-/*
-  CHSV daylight_color_back = CHSV( 0, 0, 0);
-  CHSV night_color_back = CHSV( HUE_PURPLE, 80, 20);
-  CHSV deep_night_color_back = CHSV( 0, 0, 0);
-  CRGB color_sun = getColorFromWeather();
-  CRGB color_moon = CRGB::Orange;
-  CRGB color_deep_moon = CRGB(10,53,40);
-
-  CHSV background_color;
-  CRGB indicator_color;
-
-  sunstate sun_state;
-*/
-
-  struct tm timeinfo;
-  getLocalTime( &timeinfo );
-
-  if (timeinfo.tm_year > 100 )
-  {
-    /*
-#if TESTING
-    sun_state = getSunState(test_hour, test_min, 2021, 11, 21, 0);
-#else
-    sun_state = getSunState(timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_year, timeinfo.tm_mon, timeinfo.tm_mday, timeinfo.tm_isdst);
-#endif
-    switch (sun_state) {
-      case SUNSTATE_SUN_UP:
-        background_color = daylight_color_back;
-        indicator_color = color_sun;
-      break;
-      case SUNSTATE_SUN_DOWN_BEFORE_MIDNIGHT:
-        background_color = night_color_back;
-        indicator_color = color_moon;
-      break;
-      case SUNSTATE_SUN_DOWN_AFTER_MIDNIGHT:
-        background_color = deep_night_color_back;
-        indicator_color = color_deep_moon;
-      break;
-    }
-*/
-#if TESTING
-    setSingleLED();
-#else
-    setSingleLED();
-#endif
-  } else {
-    Serial.print(F("ERROR: Time not yet set"));
-    led_statemachine_status = LED_STATE_WIFI_OK_TIME_WAITING;
-  }
+  setCurrentTempLED();
+  setRain();
+  setBrightness();
+  FastLED.show();
 }
 
 ulong last_ledupdate = 0;
@@ -1210,21 +1145,7 @@ void TaskLedHandler(void *pvParameters)
         FillLEDsFromPaletteColors(startIndex);
         FastLED.show();
         FastLED.delay(1000 / UPDATES_PER_SECOND);
-      break;
-        
-      case LED_STATE_WIFI_OK_TIME_WAITING:
-        FastLED.setBrightness(BRIGHTNESS/3);
-        fill_solid( &(leds[0]), NUM_LEDS, CRGB::Green);
-        FastLED.show();
-        
-        struct tm timeinfo;
-        getLocalTime( &timeinfo );      
-        if (timeinfo.tm_year > 100 )
-        {
-           led_statemachine_status = LED_STATE_NORMAL;
-           last_ledupdate = 0;
-        }        
-      break;        
+      break;      
         
       case LED_STATE_NORMAL:
         if (last_state != LED_STATE_NORMAL){
@@ -1367,7 +1288,7 @@ void TaskWifiHandler(void *pvParameters)
 
   // SSID/PWD to uppercase
   ssid.toUpperCase();
-  password = "My" + ssid;
+  password = "juma2024";
 
   bool configDataLoaded = false;
 
@@ -1600,45 +1521,34 @@ String SetupMeteoApi() {
 
 
 void JsonCONV() {
-    DynamicJsonDocument doc(16384); //TO DO
-    DeserializationError error = deserializeJson(doc, json_array);
+  DynamicJsonDocument doc(16384); //TO DO
+  DeserializationError error = deserializeJson(doc, json_array);
 
-    if (error) {
-     Serial.print("deserializeJson() failed: ");
-     Serial.println(error.c_str());
-     return;
-    }
-
-  //const char* daily_units_weathercode = doc["daily_units"]["weathercode"]; 
-  //const char* daily_time_0 = doc["daily"]["time"][0]; 
-  //WeatherCODE = doc["daily"]["weathercode"][0]; 
-  //Serial.print("Weathercode: ");
-  //Serial.println(WeatherCODE);
-
-  struct tm timeinfo;
-  getLocalTime( &timeinfo );
-
-  int hour_in_2h = timeinfo.tm_hour + 2;
+  if (error) {
+    Serial.print("deserializeJson() failed: ");
+    Serial.println(error.c_str());
+    return;
+  }
 
   temp_current = doc["current"]["temperature_2m"];
-  temp_in_2h = doc["hourly"]["temperature_2m"][hour_in_2h];
+  String timestr = doc["current"]["time"];
+  int curr_hour = timestr.substring(11, 13).toInt();
   rain_in_2h = 0;
 
   int i=0;
   for(i=0;i<4;i++){
-    int rain = doc["hourly"]["rain"][timeinfo.tm_hour + i];
+    int rain = doc["hourly"]["rain"][curr_hour + i];
     rain_in_2h += rain;
   }
   
   is_day = doc["current"]["is_day"];
 
-  Serial.print("Current Temp: ");
+  Serial.print("Hour: ");
+  Serial.print(curr_hour);
+  Serial.print(", Temp: ");
   Serial.print(temp_current);
-  Serial.print(", Temp2h: ");
-  Serial.print(temp_in_2h);
   Serial.print(", Rain: ");
   Serial.println(rain_in_2h);
-
 }
 
 String GET_Request(const char* server) {
