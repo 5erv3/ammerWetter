@@ -1511,7 +1511,7 @@ String SetupMeteoApi() {
     Api.replace("(LONG)", String(lon));
     Api.replace("(LAT)", String(lat));
 
-    Serial.println(Api);
+    //Serial.println(Api);
 
     return Api;
     
