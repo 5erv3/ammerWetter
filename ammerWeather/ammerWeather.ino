@@ -1511,7 +1511,7 @@ String SetupMeteoApi() {
     Api.replace("(LONG)", String(lon));
     Api.replace("(LAT)", String(lat));
 
-    //Serial.println(Api);
+    Serial.println(Api);
 
     return Api;
     
@@ -1535,8 +1535,8 @@ void JsonCONV() {
 
   int i=0;
   for(i=0;i<4;i++){
-    int rain = doc["hourly"]["rain"][curr_hour + i];
-    rain_in_2h += rain;
+    float rain = doc["hourly"]["rain"][curr_hour + i];
+    rain_in_2h += (int) (rain * 10);
   }
   
   is_day = doc["current"]["is_day"];
